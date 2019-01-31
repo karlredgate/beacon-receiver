@@ -29,6 +29,19 @@ function find_config( request, response, next ) {
     next();
 }
 
+function gather_body( request, response, next) {
+    request.setEncoding('utf8');
+    request.rawBody = '';
+    function append( chunk ) {
+        request.rawBody += chunk;
+    };
+    request.on( 'data', append );
+    function pass() {
+        next();
+    };
+    request.on( 'end', pass );
+}
+
 function beacon( request, response ) {
     var data = {
         "data": [1,2,3],
@@ -49,7 +62,8 @@ function beacon( request, response ) {
 // Change so it errors with wrong content type
 //
 function registerAPIs( app ) {
-    var parser = BodyParser.json( {type: ['application/json', 'application/*+json']} );
+    var parser = BodyParser.json( {type: ['application/json', 'application/*+json', '*/*']} );
+    app.use( gather_body );
     app.use( parser );
     app.use( find_config );
 
