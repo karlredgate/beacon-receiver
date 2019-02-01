@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
+const FS = require('fs');
 const Path = require('path');
 const Express = require('express');
 const BodyParser = require('body-parser');
 const SQLite = require('sqlite3');
+const UUID = require('uuid');
 
 function bad_request( response ) {
     response.status( 400 );
@@ -42,10 +44,14 @@ function gather_body( request, response, next) {
     request.on( 'end', pass );
 }
 
+function written() {
+}
+
 function beacon( request, response ) {
     var data = {
-        "data": [1,2,3],
-        "request": request.body
+        "timestamp": new Date(),
+        "uuid":      UUID.v4(),
+        "hostname":  request.hostname
     };
 
     if ( is_invalid(request) ) {
@@ -53,21 +59,55 @@ function beacon( request, response ) {
         return;
     }
 
-    // response.end( 'DATA' );
-    response.status( 200 );
+    console.log( 'received beacon ' + data.timestamp );
+    console.log( ' [' + request.rawBody + ' ]');
+
+    FS.writeFile( "beacons/" + data.uuid, request.rawBody, written );
+
+    var port = request.app.server.address().port;
+    data.self = "http://" + request.hostname + ":" + port + request.path + "/" + data.uuid;
+
+    response.status( 201 );
     response.set( 'Content-Type', 'application/json' );
     response.end( JSON.stringify(data) );
+}
+
+function get_beacon( request, response ) {
+    var id = request.params.id;
+    var path = 'beacons/' + id;
+
+    if ( FS.existsSync(path) == false ) {
+        console.log( "no file " + path );
+        response.status( 404 );
+        response.set( 'Content-Type', 'application/json' );
+        response.end( JSON.stringify({'error':'no beacon'}) );
+        return;
+    }
+
+    function send_response( err, data ) {
+        if ( err != null ) {
+            response.status( 500 );
+            response.set( 'Content-Type', 'application/json' );
+            response.end( JSON.stringify({'error':'failed to read file'}) );
+        }
+        response.status( 200 );
+        response.set( 'Content-Type', 'text/plain' );
+        response.end( data );
+    };
+
+    FS.readFile( path, send_response );
 }
 
 // Change so it errors with wrong content type
 //
 function registerAPIs( app ) {
-    var parser = BodyParser.json( {type: ['application/json', 'application/*+json', '*/*']} );
+    // var parser = BodyParser.json( {type: ['application/json', 'application/*+json', '*/*']} );
     app.use( gather_body );
-    app.use( parser );
+    // app.use( parser );
     app.use( find_config );
 
-    app.post( '/beacon',   beacon );
+    app.post( '/beacon',     beacon );
+    app.get(  '/beacon/:id', get_beacon );
 }
 
 function connected() {
@@ -77,6 +117,7 @@ function connected() {
 function main( argv ) {
     var db = new SQLite.Database('extapi.db');
     db.close();
+    // try { FS.mkdirSync( 'beacons' ); } catch (e) {};
 
     var port = 3200;
     var app = Express();
@@ -85,7 +126,7 @@ function main( argv ) {
     registerAPIs( app );
     var content = Path.join( __dirname, "/static/" );
     app.use( Express.static(content) );
-    app.listen( port, connected );
+    app.server = app.listen( port, connected );
 }
 
 main( process.argv );
