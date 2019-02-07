@@ -47,6 +47,23 @@ function gather_body( request, response, next) {
 function written() {
 }
 
+# Injest the beacon here
+#
+# Headers
+# X-Akamai-Stat-Agg-TableName: table1
+# X-Akamai-Stat-Agg-Interval: 0 h 0 m 60 s
+# X-Akamai-Stat-Agg-Timestamp:  Wed, 22 Aug 2018 00:22:13 GMT
+# X-Akamai-Stat-Agg-Payload-String: mothertool_stats
+#
+# BODY
+# Row_Number,account(key),hostname(key),Clients (new),Hits (Count),Response time(average)
+# 1,"Account123","www.bar.com",237,8665,89
+# 2,"Account123","www.foo.com",667,566,34
+# 3,"Account456","www.abc.com",444,987,56
+# 4,"Account456","www.xyz.com",144,3545,123
+#
+# Change this to store it in a DB - keep the header info also
+#
 function beacon( request, response ) {
     var data = {
         "timestamp": new Date(),
@@ -59,7 +76,11 @@ function beacon( request, response ) {
         return;
     }
 
-    console.log( 'received beacon ' + data.timestamp );
+    console.log( 'received beacon at ' + data.timestamp );
+    console.log( ' X-Akamai-Stat-Agg-TableName: ' + request.header["x-akamai-stat-agg-tablename"] );
+    console.log( ' X-Akamai-Stat-Agg-Interval:  ' + request.header["x-akamai-stat-agg-interval"] );
+    console.log( ' X-Akamai-Stat-Agg-Timestamp: ' + request.header["x-akamai-stat-agg-timestamp"] );
+    console.log( ' X-Akamai-Stat-Agg-Payload:   ' + request.header["x-akamai-stat-agg-payload"] );
     console.log( ' [' + request.rawBody + ' ]');
 
     FS.writeFile( "beacons/" + data.uuid, request.rawBody, written );
