@@ -77,10 +77,13 @@ function beacon( request, response ) {
     }
 
     console.log( 'received beacon at ' + data.timestamp );
-    console.log( ' X-Akamai-Stat-Agg-TableName: ' + request.header["x-akamai-stat-agg-tablename"] );
-    console.log( ' X-Akamai-Stat-Agg-Interval:  ' + request.header["x-akamai-stat-agg-interval"] );
-    console.log( ' X-Akamai-Stat-Agg-Timestamp: ' + request.header["x-akamai-stat-agg-timestamp"] );
-    console.log( ' X-Akamai-Stat-Agg-Payload:   ' + request.header["x-akamai-stat-agg-payload"] );
+    console.log( ' X-Akamai-Stat-Agg-TableName: ' + request.headers["x-akamai-stat-agg-tablename"] );
+    console.log( ' X-Akamai-Stat-Agg-Interval:  ' + request.headers["x-akamai-stat-agg-interval"] );
+    console.log( ' X-Akamai-Stat-Agg-Timestamp: ' + request.headers["x-akamai-stat-agg-timestamp"] );
+    console.log( ' X-Akamai-Stat-Agg-Payload:   ' + request.headers["x-akamai-stat-agg-payload"] );
+    for ( var name in request.headers ) {
+        console.log( "Header: " + name + " => '" + request.headers[name] + "'" );
+    }
     console.log( ' [' + request.rawBody + ' ]');
 
     FS.writeFile( "beacons/" + data.uuid, request.rawBody, written );
