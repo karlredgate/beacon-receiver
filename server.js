@@ -130,6 +130,7 @@ function registerAPIs( app ) {
     // app.use( parser );
     app.use( find_config );
 
+    app.post( '/cloud-monitor',     beacon );
     app.post( '/beacon',     beacon );
     app.get(  '/beacon/:id', get_beacon );
 }
@@ -143,7 +144,8 @@ function main( argv ) {
     db.close();
     // try { FS.mkdirSync( 'beacons' ); } catch (e) {};
 
-    var port = 3200;
+    //var port = 3200;
+    var port = 7777;
     var app = Express();
 
     app.disable( 'x-powered-by' );
