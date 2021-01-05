@@ -6,6 +6,7 @@ const Express = require('express');
 const BodyParser = require('body-parser');
 const SQLite = require('sqlite3');
 const UUID = require('uuid');
+const avro = require('avsc');
 
 function bad_request( response ) {
     response.status( 400 );
@@ -45,6 +46,7 @@ function gather_body( request, response, next) {
 }
 
 function written() {
+    console.log( "beacon stored" );
 }
 
 // Injest the beacon here
@@ -69,6 +71,7 @@ function beacon( request, response ) {
         "timestamp": new Date(),
         "uuid":      UUID.v4(),
         "hostname":  request.hostname
+        // should add content-type to response
     };
 
     if ( is_invalid(request) ) {
@@ -88,8 +91,20 @@ function beacon( request, response ) {
 
     FS.writeFile( "beacons/" + data.uuid, request.rawBody, written );
 
+    var contentType = request.headers["content-type"];
+    if ( contentType === "application/json" ) {
+        // Store in AVRO also
+        var object = JSON.parse( request.rawBody );
+        // catch errors
+        var schema = Avro.Type.forValue( object );
+        var out = Avro.createFileEncoder( "beacons.avro", schema );
+        out.write( object );
+    }
+
     var port = request.app.server.address().port;
-    data.self = "http://" + request.hostname + ":" + port + request.path + "/" + data.uuid;
+    // data.self = "http://" + request.hostname + ":" + port + request.path + "/" + data.uuid;
+    // do not use the port anymore - this is fronted by CDN
+    data.self = "http://" + request.hostname + request.path + "/" + data.uuid;
 
     response.status( 201 );
     response.set( 'Content-Type', 'application/json' );
