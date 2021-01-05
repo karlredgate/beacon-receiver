@@ -6,7 +6,7 @@ const Express = require('express');
 const BodyParser = require('body-parser');
 const SQLite = require('sqlite3');
 const UUID = require('uuid');
-const avro = require('avsc');
+const Avro = require('avsc');
 
 function bad_request( response ) {
     response.status( 400 );
@@ -97,9 +97,12 @@ function beacon( request, response ) {
         var object = JSON.parse( request.rawBody.toString("utf8") );
         // catch errors
         var schema = Avro.Type.forValue( object );
-        var out = Avro.createFileEncoder( "beacons.avro", schema );
-        out.write( object );
-
+        // var out = Avro.createFileEncoder( "beacons.avro", schema );
+        var out = new Avro.streams.BlockEncoder( schema );
+        var ws = FS.createWriteStream( "beacons.avro", {defaultEncoding: 'binary', flags: 'a'} );
+        out.pipe( ws );
+        // out.write( object );
+        out.end( object );
         data.mediatype = "application/json";
     }
 
