@@ -94,11 +94,13 @@ function beacon( request, response ) {
     var contentType = request.headers["content-type"];
     if ( contentType === "application/json" ) {
         // Store in AVRO also
-        var object = JSON.parse( request.rawBody );
+        var object = JSON.parse( request.rawBody.toString("utf8") );
         // catch errors
         var schema = Avro.Type.forValue( object );
         var out = Avro.createFileEncoder( "beacons.avro", schema );
         out.write( object );
+
+        data.mediatype = "application/json";
     }
 
     var port = request.app.server.address().port;
