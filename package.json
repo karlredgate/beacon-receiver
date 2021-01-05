@@ -6,6 +6,7 @@
   "dependencies": {
     "express": "*",
     "serve-static": "*",
+    "avsc": "*",
     "sqlite3": "*"
   },
   "devDependencies": {},
