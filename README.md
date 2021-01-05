@@ -8,4 +8,5 @@ TODO
 
  * report raw text of beacon
  * Save beacons ?
+ * Save to Avro file on S3
 
