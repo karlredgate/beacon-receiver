@@ -114,12 +114,13 @@ function beacon( request, response ) {
         var object = JSON.parse( request.rawBody.toString("utf8") );
         // catch errors
         var schema = Avro.Type.forValue( object );
-        var fp = schema.fingerprint();
+        var fp = toHex( schema.fingerprint() );
         console.log( "FP " + fp );
-        console.log( "FP " + toHex(fp) + " cons " + fp.constructor.name );
+        var filename = fp + ".avro";
         // var out = Avro.createFileEncoder( "beacons.avro", schema );
         var out = new Avro.streams.BlockEncoder( schema );
-        var ws = FS.createWriteStream( "beacons.avro", {defaultEncoding: 'binary', flags: 'a'} );
+        var mode = FS.existsSync(filename) ? 'a' : 'w';
+        var ws = FS.createWriteStream( filename, {defaultEncoding: 'binary', flags: mode} );
         out.pipe( ws );
         // out.write( object );
         out.end( object );
