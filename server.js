@@ -116,12 +116,13 @@ function beacon( request, response ) {
         var schema = Avro.Type.forValue( object );
         var fp = toHex( schema.fingerprint() );
         console.log( "FP " + fp );
+        // file
         var filename = fp + ".avro";
-        // var out = Avro.createFileEncoder( "beacons.avro", schema );
-        var out = new Avro.streams.BlockEncoder( schema );
         var mode = FS.existsSync(filename) ? 'a' : 'w';
         var head = FS.existsSync(filename) ? 'false' : 'true';
-        var ws = FS.createWriteStream( filename, {defaultEncoding: 'binary', flags: mode, 'writeHeader': head} );
+        // var out = Avro.createFileEncoder( "beacons.avro", schema );
+        var out = new Avro.streams.BlockEncoder( schema, {writeHeader: head} );
+        var ws = FS.createWriteStream( filename, {defaultEncoding: 'binary', flags: mode} );
         out.pipe( ws );
         // out.write( object );
         out.end( object );
