@@ -120,7 +120,8 @@ function beacon( request, response ) {
         // var out = Avro.createFileEncoder( "beacons.avro", schema );
         var out = new Avro.streams.BlockEncoder( schema );
         var mode = FS.existsSync(filename) ? 'a' : 'w';
-        var ws = FS.createWriteStream( filename, {defaultEncoding: 'binary', flags: mode} );
+        var head = FS.existsSync(filename) ? 'false' : 'true';
+        var ws = FS.createWriteStream( filename, {defaultEncoding: 'binary', flags: mode, 'writeHeader': head} );
         out.pipe( ws );
         // out.write( object );
         out.end( object );
