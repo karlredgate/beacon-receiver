@@ -119,7 +119,7 @@ function beacon( request, response ) {
         // file
         var filename = fp + ".avro";
         var mode = FS.existsSync(filename) ? 'a' : 'w';
-        var head = FS.existsSync(filename) ? 'false' : 'true';
+        var head = FS.existsSync(filename) ? false : true;
         console.log( "header is " + head );
         // var out = Avro.createFileEncoder( "beacons.avro", schema );
         var out = new Avro.streams.BlockEncoder( schema, {writeHeader: head} );
