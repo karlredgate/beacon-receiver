@@ -8,6 +8,23 @@ const SQLite = require('sqlite3');
 const UUID = require('uuid');
 const Avro = require('avsc');
 
+const nybbles = ['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'];
+function asHex( c ) {
+    var hi = c >> 4;
+    var lo = c & 0xF;
+    n1 = nybbles[hi];
+    n2 = nybbles[lo];
+    return n1 + n2;
+}
+function toHex(buf) {
+    var chars = new Array( buf.length );
+    for ( let i = 0 ; i < buf.length ; ++i ) {
+        chars[i] = asHex( buf[i] );
+    }
+    return chars.join('');
+}
+
+
 function bad_request( response ) {
     response.status( 400 );
     response.send( '{"error": "invalid"}' );
@@ -97,6 +114,9 @@ function beacon( request, response ) {
         var object = JSON.parse( request.rawBody.toString("utf8") );
         // catch errors
         var schema = Avro.Type.forValue( object );
+        var fp = schema.fingerprint();
+        console.log( "FP " + fp );
+        console.log( "FP " + toHex(fp) + " cons " + fp.constructor.name );
         // var out = Avro.createFileEncoder( "beacons.avro", schema );
         var out = new Avro.streams.BlockEncoder( schema );
         var ws = FS.createWriteStream( "beacons.avro", {defaultEncoding: 'binary', flags: 'a'} );
