@@ -177,6 +177,7 @@ function registerAPIs( app ) {
 
     app.post( '/cloud-monitor',     beacon );
     app.post( '/beacon',     beacon );
+    app.post( '/exceptions', beacon );
     app.get(  '/beacon/:id', get_beacon );
 }
 
