@@ -38,6 +38,10 @@ function is_invalid( request ) {
     return false;
 }
 
+function getClientIP( req ) {
+    return req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+}
+
 function find_config( request, response, next ) {
     if ( typeof request.query.config_id == 'undefined' ) {
         // Check if there are more than one for this account
@@ -83,17 +87,57 @@ function written() {
 //
 // Change this to store it in a DB - keep the header info also
 //
+
+function json_beacon( request, response ) {
+    console.log( "JSON beacon" );
+    var filename = "beacons/" + response.beacon.uuid;
+
+    FS.writeFile( filename, request.rawBody, written );
+
+    response.status( 201 );
+    response.set( 'Content-Type', 'application/json' );
+    response.end( JSON.stringify(response.beacon) );
+}
+
+// console.log( ' X-Akamai-Stat-Agg-TableName: ' + request.headers["x-akamai-stat-agg-tablename"] );
+// console.log( ' X-Akamai-Stat-Agg-Interval:  ' + request.headers["x-akamai-stat-agg-interval"] );
+// console.log( ' X-Akamai-Stat-Agg-Timestamp: ' + request.headers["x-akamai-stat-agg-timestamp"] );
+// console.log( ' X-Akamai-Stat-Agg-Payload:   ' + request.headers["x-akamai-stat-agg-payload"] );
+function mothertool_beacon( request, response ) {
+    var table = request.headers["x-akamai-stat-agg-tablename"];
+    var timestamp = request.headers["x-akamai-stat-agg-timestamp"];
+    var dirname = "mothertool/" + table;
+    var filename = dirname + "/" + response.beacon.uuid;
+    var client = request.ip;
+    var client2 = request.connection.remoteAddress;
+
+    console.log( "Mothertool beacon from " + client + " : " + client2 );
+
+    response.beacon.table = table;
+
+    try { FS.mkdirSync(dirname) } catch (e) {};
+    FS.writeFile( filename, request.rawBody, written );
+
+    response.status( 201 );
+    response.set( 'Content-Type', 'application/json' );
+    response.end( JSON.stringify(response.beacon) );
+}
+
 function beacon( request, response ) {
-    var data = {
+    response.beacon = {
         "timestamp": new Date(),
         "uuid":      UUID.v4(),
         "hostname":  request.hostname
-        // should add content-type to response
     };
+    var data = response.beacon;
 
     if ( is_invalid(request) ) {
         bad_request( response );
         return;
+    }
+
+    if ( request.headers["x-akamai-stat-agg-tablename"] !== "" ) {
+        return mothertool_beacon( request, response );
     }
 
     console.log( 'received beacon at ' + data.timestamp );
@@ -189,6 +233,7 @@ function main( argv ) {
     var db = new SQLite.Database('extapi.db');
     db.close();
     // try { FS.mkdirSync( 'beacons' ); } catch (e) {};
+    try { FS.mkdirSync('mothertool') } catch (e) {};
 
     //var port = 3200;
     var port = 7777;
