@@ -53,6 +53,10 @@ function find_config( request, response, next ) {
     next();
 }
 
+/*
+ * Set up the receive stream data handler callback function.
+ * The handler is called for each chunk of data received from the client.
+ */
 function gather_body( request, response, next) {
     request.setEncoding('utf8');
     request.rawBody = '';
@@ -66,8 +70,51 @@ function gather_body( request, response, next) {
     request.on( 'end', pass );
 }
 
+/*
+ * Used as a generic callback.
+ */
 function written() {
     console.log( "beacon stored" );
+}
+
+/*
+ */
+function log_debug_info( request, response ) {
+    console.log( 'received beacon at ' + response.beacon.timestamp );
+    console.log( ' X-Akamai-Stat-Agg-TableName: ' + request.headers["x-akamai-stat-agg-tablename"] );
+    console.log( ' X-Akamai-Stat-Agg-Interval:  ' + request.headers["x-akamai-stat-agg-interval"] );
+    console.log( ' X-Akamai-Stat-Agg-Timestamp: ' + request.headers["x-akamai-stat-agg-timestamp"] );
+    console.log( ' X-Akamai-Stat-Agg-Payload:   ' + request.headers["x-akamai-stat-agg-payload"] );
+    for ( var name in request.headers ) {
+        console.log( "Header: " + name + " => '" + request.headers[name] + "'" );
+    }
+    console.log( '<<<' + request.rawBody + '>>>');
+}
+
+function respond( response ) {
+    response.status( 201 );
+    response.set( 'Content-Type', 'application/json' );
+    response.end( JSON.stringify(response.beacon) );
+}
+
+function update_avro( request, response ) {
+    var object = JSON.parse( request.rawBody.toString("utf8") );
+    // catch errors
+    var schema = Avro.Type.forValue( object );
+    var f = schema.fingerprint();
+    var fp = toHex( f );
+    console.log( "FP " + fp );
+    // file
+    var filename = fp + ".avro";
+    var mode = FS.existsSync(filename) ? 'a' : 'w';
+    var head = FS.existsSync(filename) ? false : true;
+    console.log( "header is " + head );
+    // var out = Avro.createFileEncoder( "beacons.avro", schema );
+    var out = new Avro.streams.BlockEncoder( schema, {syncMarker: f, writeHeader: head} );
+    var ws = FS.createWriteStream( filename, {defaultEncoding: 'binary', flags: mode} );
+    out.pipe( ws );
+    // out.write( object );
+    out.end( object );
 }
 
 // Injest the beacon here
@@ -91,36 +138,24 @@ function written() {
 function json_beacon( request, response ) {
     console.log( "JSON beacon" );
     var filename = "beacons/" + response.beacon.uuid;
-
     FS.writeFile( filename, request.rawBody, written );
-
-    response.status( 201 );
-    response.set( 'Content-Type', 'application/json' );
-    response.end( JSON.stringify(response.beacon) );
+    update_avro( request, response );
+    respond( response );
 }
 
-// console.log( ' X-Akamai-Stat-Agg-TableName: ' + request.headers["x-akamai-stat-agg-tablename"] );
-// console.log( ' X-Akamai-Stat-Agg-Interval:  ' + request.headers["x-akamai-stat-agg-interval"] );
-// console.log( ' X-Akamai-Stat-Agg-Timestamp: ' + request.headers["x-akamai-stat-agg-timestamp"] );
-// console.log( ' X-Akamai-Stat-Agg-Payload:   ' + request.headers["x-akamai-stat-agg-payload"] );
 function mothertool_beacon( request, response ) {
     var table = request.headers["x-akamai-stat-agg-tablename"];
     var timestamp = request.headers["x-akamai-stat-agg-timestamp"];
     var dirname = "mothertool/" + table;
     var filename = dirname + "/" + response.beacon.uuid;
-    var client = request.ip;
-    var client2 = request.connection.remoteAddress;
+    var client = request.ip; // or request.connection.remoteAddress;
 
-    console.log( "Mothertool beacon from " + client + " : " + client2 );
+    console.log( "Mothertool beacon from " + client );
 
     response.beacon.table = table;
-
     try { FS.mkdirSync(dirname) } catch (e) {};
     FS.writeFile( filename, request.rawBody, written );
-
-    response.status( 201 );
-    response.set( 'Content-Type', 'application/json' );
-    response.end( JSON.stringify(response.beacon) );
+    respond( response );
 }
 
 function beacon( request, response ) {
@@ -130,59 +165,29 @@ function beacon( request, response ) {
         "hostname":  request.hostname
     };
     var data = response.beacon;
+    // var port = request.app.server.address().port;
+    /* do not use the port in the URL anymore - this is fronted by CDN, so a std port is provided */
+    data.self = "http://" + request.hostname + request.path + "/" + data.uuid;
 
     if ( is_invalid(request) ) {
         bad_request( response );
         return;
     }
 
+    log_debug_info( request, response );
+
     if ( request.headers["x-akamai-stat-agg-tablename"] !== "" ) {
         return mothertool_beacon( request, response );
     }
 
-    console.log( 'received beacon at ' + data.timestamp );
-    console.log( ' X-Akamai-Stat-Agg-TableName: ' + request.headers["x-akamai-stat-agg-tablename"] );
-    console.log( ' X-Akamai-Stat-Agg-Interval:  ' + request.headers["x-akamai-stat-agg-interval"] );
-    console.log( ' X-Akamai-Stat-Agg-Timestamp: ' + request.headers["x-akamai-stat-agg-timestamp"] );
-    console.log( ' X-Akamai-Stat-Agg-Payload:   ' + request.headers["x-akamai-stat-agg-payload"] );
-    for ( var name in request.headers ) {
-        console.log( "Header: " + name + " => '" + request.headers[name] + "'" );
-    }
-    console.log( ' [' + request.rawBody + ' ]');
-
-    FS.writeFile( "beacons/" + data.uuid, request.rawBody, written );
-
     var contentType = request.headers["content-type"];
     if ( contentType === "application/json" ) {
-        // Store in AVRO also
-        var object = JSON.parse( request.rawBody.toString("utf8") );
-        // catch errors
-        var schema = Avro.Type.forValue( object );
-        var f = schema.fingerprint();
-        var fp = toHex( f );
-        console.log( "FP " + fp );
-        // file
-        var filename = fp + ".avro";
-        var mode = FS.existsSync(filename) ? 'a' : 'w';
-        var head = FS.existsSync(filename) ? false : true;
-        console.log( "header is " + head );
-        // var out = Avro.createFileEncoder( "beacons.avro", schema );
-        var out = new Avro.streams.BlockEncoder( schema, {syncMarker: f, writeHeader: head} );
-        var ws = FS.createWriteStream( filename, {defaultEncoding: 'binary', flags: mode} );
-        out.pipe( ws );
-        // out.write( object );
-        out.end( object );
-        data.mediatype = "application/json";
+        return json_beacon( request, response );
     }
 
-    var port = request.app.server.address().port;
-    // data.self = "http://" + request.hostname + ":" + port + request.path + "/" + data.uuid;
-    // do not use the port anymore - this is fronted by CDN
-    data.self = "http://" + request.hostname + request.path + "/" + data.uuid;
-
-    response.status( 201 );
-    response.set( 'Content-Type', 'application/json' );
-    response.end( JSON.stringify(data) );
+    /* No specific beacon handler, so just store the generic beacon.  */
+    FS.writeFile( "beacons/" + data.uuid, request.rawBody, written );
+    respond( response );
 }
 
 function get_beacon( request, response ) {
@@ -226,7 +231,8 @@ function registerAPIs( app ) {
 }
 
 function connected() {
-    console.log( "server started" );
+    var timestamp = new Date();
+    console.log( "server started at " + timestamp );
 }
 
 function main( argv ) {
